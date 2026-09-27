@@ -17,6 +17,7 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation-jvm:2.3.12")
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:2.3.12")
     implementation("io.ktor:ktor-client-cio-jvm:2.3.12")
+    implementation("org.xerial:sqlite-jdbc:3.49.1.0")
     implementation("ch.qos.logback:logback-classic:1.5.6")
 }
 

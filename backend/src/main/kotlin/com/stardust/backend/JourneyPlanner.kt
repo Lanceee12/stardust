@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.util.UUID
 
 object JourneyPlanner {
     private val json = Json { ignoreUnknownKeys = true }
@@ -46,6 +47,53 @@ object JourneyPlanner {
             require(generated.size == 3)
             generated.mapIndexed { index, activity -> activity.copy(id = "${mode}-${index + 1}", done = false) }
         }.getOrElse { fallback(mode, interests) }
+    }
+
+    suspend fun replacement(mode: String, interests: List<String>, excludedTitles: Set<String>): JourneyActivity {
+        val apiKey = System.getenv("OPENAI_API_KEY")?.takeIf(String::isNotBlank)
+        if (apiKey != null) {
+            val generated = runCatching {
+                val prompt = "Create one warm, specific, low-pressure ${if (mode == "friend") "friendship" else "dating"} activity. Keep it safe in public places, accessible, low-cost, and doable in one or two hours. Consider these interests: ${interests.joinToString()}. Do not repeat any of these ideas: ${excludedTitles.joinToString("; ")}. Return JSON only as {\"title\":\"...\",\"detail\":\"...\"}."
+                val response = client.post("https://api.openai.com/v1/chat/completions") {
+                    header(HttpHeaders.Authorization, "Bearer $apiKey")
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(buildJsonObject {
+                        put("model", System.getenv("OPENAI_MODEL") ?: "gpt-4o-mini")
+                        put("response_format", buildJsonObject { put("type", "json_object") })
+                        put("messages", buildJsonArray {
+                            add(buildJsonObject { put("role", "user"); put("content", prompt) })
+                        })
+                    }))
+                }
+                val body = json.parseToJsonElement(response.bodyAsText())
+                val content = body.jsonObject["choices"]!!.jsonArray[0].jsonObject["message"]!!.jsonObject["content"]!!.jsonPrimitive.content
+                json.decodeFromString<GeneratedActivityIdea>(content)
+            }.getOrNull()
+            if (generated != null && generated.title.isNotBlank() && generated.title !in excludedTitles) {
+                return JourneyActivity("${mode}-${UUID.randomUUID()}", generated.title, generated.detail)
+            }
+        }
+        return fallbackReplacement(mode, interests, excludedTitles)
+    }
+
+    private fun fallbackReplacement(mode: String, interests: List<String>, excludedTitles: Set<String>): JourneyActivity {
+        val focus = interests.firstOrNull() ?: "something new"
+        val options = if (mode == "friend") listOf(
+            "Try a neighborhood photo walk" to "Pick a relaxed public route and take turns choosing a detail worth photographing.",
+            "Share a favorite local snack" to "Choose a casual public market and introduce each other to a small treat you enjoy.",
+            "Trade tiny creative challenges" to "Try a playful ten-minute sketch, playlist, or word game inspired by $focus.",
+            "Explore a free community event" to "Find a welcoming public event and each pick one thing to check out together.",
+            "Plan a two-person trivia round" to "Choose a topic you both like and make a few lighthearted questions for each other."
+        ) else listOf(
+            "Build a mini date playlist" to "Choose three songs each around $focus and share the story behind one pick.",
+            "Visit a public garden" to "Take a relaxed walk and each choose a favorite spot to stop and talk.",
+            "Pick a bookstore question" to "Browse a local bookshop and choose a cover that reminds you of a good memory.",
+            "Try a low-key dessert stop" to "Meet at a public cafe and each choose a treat for the other to try.",
+            "Trade travel daydreams" to "Sketch out a pretend one-day trip and compare what you would both include."
+        )
+        val available = options.filterNot { it.first in excludedTitles }.ifEmpty { options }
+        val (title, detail) = available.random()
+        return JourneyActivity("${mode}-${UUID.randomUUID()}", title, detail)
     }
 
     private fun fallback(mode: String, interests: List<String>): List<JourneyActivity> {

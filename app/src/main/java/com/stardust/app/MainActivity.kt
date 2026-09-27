@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,16 +27,19 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -51,17 +55,21 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -84,13 +92,21 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -101,14 +117,6 @@ private val Pink = Color(0xFFF2AFC9)
 private val Gold = Color(0xFFFFD681)
 private val Paper = Color(0xFFFFF9F5)
 private val Glass = Color(0xCC25385E)
-
-private val fallbackProfiles = listOf(
-    MatchProfile("joe", "Joe Black", 33, "Man", "Straight", "A good coffee, a long walk, and a little friendly competition.", "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=900", listOf("Coffee", "Travel", "Games")),
-    MatchProfile("nick", "Nick Perval", 27, "Man", "Straight", "Usually planning my next trip or trying a new recipe.", "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=900", listOf("Travel", "Cooking", "Music")),
-    MatchProfile("leo", "Leo Rivera", 30, "Man", "Straight", "Museum dates, midnight playlists, and terrible puns.", "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=900", listOf("Art", "Music", "Books")),
-    MatchProfile("maya", "Maya Chen", 29, "Woman", "Straight", "Looking for thoughtful friends for little city adventures.", "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900", listOf("Art", "Hiking", "Food")),
-    MatchProfile("amara", "Amara James", 31, "Woman", "Straight", "A friend for weekend markets and spontaneous day trips.", "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=900", listOf("Travel", "Coffee", "Movies"))
-)
 
 private val fallbackActivities = listOf(
     JourneyActivity("coffee", "Find your little coffee spot", "Pick a cozy cafe and trade the stories behind your favorite comfort drinks."),
@@ -131,16 +139,251 @@ class MainActivity : ComponentActivity() {
 
 private enum class Tab(val label: String) { Swipe("Swipe"), Journey("Journey"), Likes("Likes"), Chat("Chat"), Profile("Profile") }
 
+private enum class AuthScreen { Welcome, SignIn, Onboarding, ForgotPassword, NewPassword }
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun AuthFlow(api: StardustApi, onAuthenticated: (AuthSession) -> Unit) {
+    var screen by remember { mutableStateOf(AuthScreen.Welcome) }
+    var name by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf("Female") }
+    var birthDate by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var sexuality by remember { mutableStateOf("Straight") }
+    var ageRange by remember { mutableStateOf("26-34") }
+    var interests by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var resetCode by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var demoCode by remember { mutableStateOf<String?>(null) }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var showBirthDatePicker by remember { mutableStateOf(false) }
+    val birthDatePickerState = rememberDatePickerState()
+    val scope = rememberCoroutineScope()
+
+    Box(Modifier.fillMaxSize()) {
+        StarfieldBackground()
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (screen == AuthScreen.Welcome) {
+                Spacer(Modifier.height(24.dp))
+                LogoMark(126.dp)
+                Text("Stardust", color = Paper, fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+                Text("FIND YOUR DESTINED STAR", color = Pink, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(18.dp))
+                Text("Find your star", color = Paper, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("Let the constellations guide you toward a meaningful connection.", color = Paper.copy(alpha = .75f), textAlign = TextAlign.Center, fontSize = 13.sp)
+                Button(onClick = { screen = AuthScreen.Onboarding }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp), colors = ButtonDefaults.buttonColors(containerColor = Pink), shape = RoundedCornerShape(24.dp)) {
+                    Text("Get started  →", color = Ink, fontWeight = FontWeight.Bold)
+                }
+                TextButton(onClick = { feedback = null; screen = AuthScreen.SignIn }) { Text("Already have an account?  Sign in", color = Paper) }
+            } else {
+                LogoMark(58.dp)
+                Text(
+                    when (screen) {
+                        AuthScreen.SignIn -> "Sign In To Stardust"
+                        AuthScreen.Onboarding -> "Welcome To Stardust"
+                        AuthScreen.ForgotPassword -> "Reset Password"
+                        AuthScreen.NewPassword -> "Create New Password"
+                        AuthScreen.Welcome -> "Stardust"
+                    },
+                    color = Paper,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    textAlign = TextAlign.Center
+                )
+                when (screen) {
+                    AuthScreen.SignIn -> {
+                        OutlinedTextField(email, { email = it; feedback = null }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
+                        OutlinedTextField(password, { password = it; feedback = null }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
+                        TextButton(onClick = { feedback = null; screen = AuthScreen.ForgotPassword }, modifier = Modifier.align(Alignment.End)) { Text("Forgot password?", color = Gold) }
+                        Button(
+                            onClick = {
+                                busy = true
+                                scope.launch {
+                                    runCatching { api.login(LoginRequest(email.trim(), password)) }
+                                        .onSuccess(onAuthenticated)
+                                        .onFailure { feedback = it.message ?: "Sign in failed." }
+                                    busy = false
+                                }
+                            }, enabled = !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Pink), shape = RoundedCornerShape(24.dp)
+                        ) { Text(if (busy) "Signing in…" else "Sign In", color = Ink, fontWeight = FontWeight.Bold) }
+                        TextButton(onClick = { feedback = null; screen = AuthScreen.Onboarding }) { Text("Don't have an account?  Sign up", color = Paper) }
+                    }
+                    AuthScreen.Onboarding -> {
+                        OutlinedTextField(name, { name = it; feedback = null }, label = { Text("Full name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        Text("Gender", color = Paper.copy(alpha = .75f), modifier = Modifier.align(Alignment.Start), fontSize = 12.sp)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            listOf("Male", "Female", "Others").forEach { choice ->
+                                Row(Modifier.weight(1f).clickable { gender = choice }, verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(selected = gender == choice, onClick = { gender = choice })
+                                    Text(choice, color = Paper, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            birthDate,
+                            onValueChange = {},
+                            label = { Text("Birth date") },
+                            modifier = Modifier.fillMaxWidth().clickable { showBirthDatePicker = true },
+                            singleLine = true,
+                            readOnly = true,
+                            trailingIcon = { IconButton(onClick = { showBirthDatePicker = true }) { Icon(Icons.Filled.CalendarToday, "Choose birth date", tint = Blue) } }
+                        )
+                        OutlinedTextField(location, { location = it; feedback = null }, label = { Text("Location") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(phoneNumber, { phoneNumber = it; feedback = null }, label = { Text("Phone number") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
+                        OutlinedTextField(sexuality, { sexuality = it }, label = { Text("Sexuality") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(ageRange, { ageRange = it }, label = { Text("Dating age range") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(interests, { interests = it }, label = { Text("Interests, separated by commas") }, modifier = Modifier.fillMaxWidth(), maxLines = 2)
+                        OutlinedTextField(email, { email = it; feedback = null }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
+                        OutlinedTextField(password, { password = it; feedback = null }, label = { Text("Password · at least 8 characters") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
+                        OutlinedTextField(confirmation, { confirmation = it; feedback = null }, label = { Text("Confirm password") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
+                        Button(
+                            onClick = {
+                                if (password != confirmation) {
+                                    feedback = "Your passwords do not match."
+                                } else {
+                                    busy = true
+                                    val request = RegisterRequest(name, email.trim(), password, gender, birthDate, location, phoneNumber, sexuality, ageRange, interests.split(',').map(String::trim).filter(String::isNotEmpty))
+                                    scope.launch {
+                                        runCatching { api.register(request) }
+                                            .onSuccess(onAuthenticated)
+                                            .onFailure { feedback = it.message ?: "Registration failed." }
+                                        busy = false
+                                    }
+                                }
+                            }, enabled = !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Pink), shape = RoundedCornerShape(24.dp)
+                        ) { Text(if (busy) "Creating account…" else "Sign Up", color = Ink, fontWeight = FontWeight.Bold) }
+                        TextButton(onClick = { feedback = null; screen = AuthScreen.SignIn }) { Text("Already have an account?  Sign in", color = Paper) }
+                    }
+                    AuthScreen.ForgotPassword -> {
+                        OutlinedTextField(email, { email = it; feedback = null }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
+                        Button(
+                            onClick = {
+                                busy = true
+                                scope.launch {
+                                    runCatching { api.requestPasswordReset(email.trim()) }.onSuccess { result ->
+                                        demoCode = result.demoCode
+                                        feedback = result.message
+                                        screen = AuthScreen.NewPassword
+                                    }.onFailure { feedback = it.message ?: "Could not request a reset code." }
+                                    busy = false
+                                }
+                            }, enabled = !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Pink), shape = RoundedCornerShape(24.dp)
+                        ) { Text("Send Code", color = Ink, fontWeight = FontWeight.Bold) }
+                        TextButton(onClick = { feedback = null; screen = AuthScreen.SignIn }) { Text("Remember your password?  Sign in", color = Paper) }
+                    }
+                    AuthScreen.NewPassword -> {
+                        if (demoCode != null) Text("Prototype verification code: $demoCode", color = Gold, fontSize = 12.sp)
+                        OutlinedTextField(resetCode, { resetCode = it; feedback = null }, label = { Text("Verification code") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                        OutlinedTextField(newPassword, { newPassword = it; feedback = null }, label = { Text("New password") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
+                        OutlinedTextField(confirmation, { confirmation = it; feedback = null }, label = { Text("Confirm password") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
+                        Button(
+                            onClick = {
+                                if (newPassword != confirmation) feedback = "Your passwords do not match."
+                                else {
+                                    busy = true
+                                    scope.launch {
+                                        runCatching { api.resetPassword(ResetPasswordRequest(email.trim(), resetCode, newPassword)) }
+                                            .onSuccess { feedback = it.message; password = ""; screen = AuthScreen.SignIn }
+                                            .onFailure { feedback = it.message ?: "Password could not be changed." }
+                                        busy = false
+                                    }
+                                }
+                            }, enabled = !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Pink), shape = RoundedCornerShape(24.dp)
+                        ) { Text("Continue to Sign In", color = Ink, fontWeight = FontWeight.Bold) }
+                    }
+                    AuthScreen.Welcome -> Unit
+                }
+                feedback?.let { Text(it, color = Gold, fontSize = 12.sp, textAlign = TextAlign.Center) }
+            }
+        }
+        if (showBirthDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { showBirthDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        birthDatePickerState.selectedDateMillis?.let { timestamp ->
+                            birthDate = Instant.ofEpochMilli(timestamp).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                        }
+                        showBirthDatePicker = false
+                    }) { Text("Choose", color = Gold) }
+                },
+                dismissButton = { TextButton(onClick = { showBirthDatePicker = false }) { Text("Cancel", color = Paper) } }
+            ) {
+                DatePicker(state = birthDatePickerState)
+            }
+        }
+    }
+}
+
 @Composable
 private fun StardustApp() {
+    val context = LocalContext.current
     val api = remember { StardustApi() }
+    val preferences = remember { context.getSharedPreferences("stardust_session", android.content.Context.MODE_PRIVATE) }
+    val scope = rememberCoroutineScope()
+    var profile by remember { mutableStateOf<UserProfile?>(null) }
+    var sessionLoaded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val token = preferences.getString("token", null)
+        api.setSessionToken(token)
+        if (token != null) {
+            profile = runCatching { api.profile() }.getOrNull()
+            if (profile == null) {
+                api.setSessionToken(null)
+                preferences.edit().remove("token").apply()
+            }
+        }
+        sessionLoaded = true
+    }
+
+    when {
+        !sessionLoaded -> Box(Modifier.fillMaxSize()) { StarfieldBackground() }
+        profile == null -> AuthFlow(api) { session ->
+            api.setSessionToken(session.token)
+            preferences.edit().putString("token", session.token).apply()
+            profile = session.profile
+        }
+        else -> AuthenticatedApp(
+            api = api,
+            initialUser = profile!!,
+            onUserUpdated = { profile = it },
+            onSignOut = {
+                scope.launch {
+                    runCatching { api.logout() }
+                    api.setSessionToken(null)
+                    preferences.edit().remove("token").apply()
+                    profile = null
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AuthenticatedApp(
+    api: StardustApi,
+    initialUser: UserProfile,
+    onUserUpdated: (UserProfile) -> Unit,
+    onSignOut: () -> Unit
+) {
     val scope = rememberCoroutineScope()
     val profiles = remember { mutableStateListOf<MatchProfile>() }
     val likedProfiles = remember { mutableStateListOf<MatchProfile>() }
     val chats = remember { mutableStateListOf<ChatPreview>() }
     val messages = remember { mutableStateListOf<ChatMessage>() }
+    val journeyOptions = remember { mutableStateListOf<JourneySummary>() }
     var journey by remember { mutableStateOf(Journey("first-spark", "Your match", fallbackActivities)) }
-    var user by remember { mutableStateOf(UserProfile("Alex Morgan", 28, "Woman", "Straight", "26-34", listOf("Travel", "Live music", "Cooking"))) }
+    var user by remember(initialUser.email) { mutableStateOf(initialUser) }
     var tab by remember { mutableStateOf(Tab.Swipe) }
     var mode by remember { mutableStateOf("dating") }
     var profileIndex by remember { mutableIntStateOf(0) }
@@ -151,35 +394,59 @@ private fun StardustApp() {
     var editProfile by remember { mutableStateOf(false) }
     var apiConnected by remember { mutableStateOf(false) }
     var infoMessage by remember { mutableStateOf<String?>(null) }
+    var swipeNotification by remember { mutableStateOf<SwipeNotification?>(null) }
 
     fun refreshProfiles() {
         scope.launch {
             val remote = runCatching { api.profiles(mode) }
             if (remote.isSuccess) apiConnected = true
             profiles.clear()
-            profiles.addAll(remote.getOrNull() ?: fallbackProfiles.filter {
-                if (mode == "friend") it.gender == user.gender && it.sexuality == "Straight"
-                else it.gender != user.gender && it.sexuality == user.sexuality
-            })
+            profiles.addAll(remote.getOrNull().orEmpty())
             profileIndex = 0
         }
     }
 
     LaunchedEffect(Unit) {
-        val remoteUser = runCatching { api.profile() }
-        remoteUser.onSuccess {
-            user = it
-            if (it.relationshipLocked) mode = "friend"
-        }
-        val initialMode = if (remoteUser.getOrNull()?.relationshipLocked == true) "friend" else "dating"
+        val initialMode = if (user.relationshipLocked) "friend" else "dating"
         val remoteProfiles = runCatching { api.profiles(initialMode) }
         if (remoteProfiles.isSuccess) apiConnected = true
-        profiles.addAll(remoteProfiles.getOrNull() ?: fallbackProfiles.filter {
-            if (initialMode == "friend") it.gender == user.gender && it.sexuality == "Straight" else it.gender != user.gender
-        })
-        runCatching { api.journey() }.onSuccess { journey = it }
+        profiles.addAll(remoteProfiles.getOrNull().orEmpty())
         runCatching { api.likes() }.onSuccess { likedProfiles.addAll(it) }
         runCatching { api.chats() }.onSuccess { chats.addAll(it) }
+        runCatching { api.journeys() }.onSuccess { options ->
+            journeyOptions.addAll(options)
+            options.firstOrNull()?.let { first -> runCatching { api.journey(first.partnerId) }.onSuccess { journey = it } }
+        }
+    }
+
+    LaunchedEffect(tab, selectedChat?.id) {
+        if (tab == Tab.Chat) {
+            while (true) {
+                if (selectedChat == null) {
+                    runCatching { api.chats() }.onSuccess { refreshed -> chats.clear(); chats.addAll(refreshed) }
+                } else {
+                    runCatching { api.messages(selectedChat!!.id) }.onSuccess { refreshed ->
+                        messages.clear()
+                        messages.addAll(refreshed)
+                    }
+                }
+                delay(1800)
+            }
+        }
+    }
+
+    LaunchedEffect(user.email) {
+        while (true) {
+            if (swipeNotification == null) {
+                runCatching { api.notifications() }.onSuccess { unread ->
+                    unread.firstOrNull()?.let { notification ->
+                        swipeNotification = notification
+                        runCatching { api.markNotificationRead(notification.id) }
+                    }
+                }
+            }
+            delay(3000)
+        }
     }
 
     fun swipe(accepted: Boolean) {
@@ -191,11 +458,12 @@ private fun StardustApp() {
                 journey = journey.copy(partnerName = current.name)
                 infoMessage = "A little spark with ${current.name}. Say hello in Chat."
                 if (swipeResult.isSuccess) {
-                    runCatching { api.generateJourney(mode) }.onSuccess {
-                        journey = it.copy(partnerName = current.name)
+                    runCatching { api.generateJourney(mode, current.id) }.onSuccess {
+                        journey = it
                         apiConnected = true
                     }
                     runCatching { api.chats() }.onSuccess { refreshed -> chats.clear(); chats.addAll(refreshed) }
+                    runCatching { api.journeys() }.onSuccess { refreshed -> journeyOptions.clear(); journeyOptions.addAll(refreshed) }
                 } else if (chats.none { it.id == current.id }) {
                     chats.add(ChatPreview(current.id, current.name, current.photoUrl, "Send a little hello", 0))
                 }
@@ -225,14 +493,27 @@ private fun StardustApp() {
                     )
                     Tab.Journey -> JourneyScreen(
                         journey = journey,
-                        hasConnection = chats.isNotEmpty(),
+                        journeys = journeyOptions,
+                        onSelectJourney = { option ->
+                            scope.launch { runCatching { api.journey(option.partnerId) }.onSuccess { journey = it; apiConnected = true } }
+                        },
                         onFinishActivity = { pendingActivity = it },
+                        onSkipActivity = { activity ->
+                            scope.launch {
+                                runCatching { api.refreshActivity(activity.id, journey.partnerId) }.onSuccess { refreshed ->
+                                    journey = refreshed
+                                    apiConnected = true
+                                    runCatching { api.journeys() }.onSuccess { journeyOptions.clear(); journeyOptions.addAll(it) }
+                                }.onFailure { infoMessage = it.message ?: "Could not find another idea." }
+                            }
+                        },
                         onDecision = { showOutcome = true },
                         onRegenerate = {
+                            val modeForJourney = journey.mode
                             scope.launch {
-                                val generated = runCatching { api.generateJourney(mode) }
+                                val generated = runCatching { api.generateJourney(modeForJourney, journey.partnerId) }
                                 if (generated.isSuccess) {
-                                    journey = generated.getOrThrow().copy(partnerName = journey.partnerName)
+                                    journey = generated.getOrThrow()
                                     apiConnected = true
                                 } else {
                                     journey = journey.copy(activities = fallbackActivities.map { it.copy(done = false) }, outcome = null)
@@ -269,7 +550,7 @@ private fun StardustApp() {
                         },
                         onBack = { selectedChat = null }
                     )
-                    Tab.Profile -> ProfileScreen(user, journey.outcome == "marriage", onEdit = { editProfile = true })
+                    Tab.Profile -> ProfileScreen(user, user.relationshipLocked, onEdit = { editProfile = true }, onSignOut = onSignOut)
                 }
             }
         }
@@ -283,16 +564,31 @@ private fun StardustApp() {
             text = { Text("${activity.title}\n\nYour honest check-in helps shape what comes next.", color = Paper.copy(alpha = .8f)) },
             confirmButton = {
                 TextButton(onClick = {
-                    journey = journey.copy(activities = journey.activities.map { if (it.id == activity.id) it.copy(done = true) else it })
-                    scope.launch { runCatching { api.completeActivity(activity.id, "great") }.onSuccess { apiConnected = true } }
+                    journey = journey.copy(
+                        activities = journey.activities.map { if (it.id == activity.id) it.copy(done = true) else it },
+                        feedback = journey.feedback + (activity.id to "great")
+                    )
+                    scope.launch {
+                        runCatching { api.completeActivity(activity.id, "great", journey.partnerId) }.onSuccess {
+                            apiConnected = true
+                            runCatching { api.journeys() }.onSuccess { journeyOptions.clear(); journeyOptions.addAll(it) }
+                        }
+                    }
                     pendingActivity = null
                     if (journey.activities.all { it.done || it.id == activity.id }) showOutcome = true
                 }) { Text("It was lovely", color = Gold) }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    journey = journey.copy(activities = journey.activities.map { if (it.id == activity.id) it.copy(done = true) else it })
-                    scope.launch { runCatching { api.completeActivity(activity.id, "not-for-us") } }
+                    journey = journey.copy(
+                        activities = journey.activities.map { if (it.id == activity.id) it.copy(done = true) else it },
+                        feedback = journey.feedback + (activity.id to "not-for-us")
+                    )
+                    scope.launch {
+                        runCatching { api.completeActivity(activity.id, "not-for-us", journey.partnerId) }.onSuccess {
+                            runCatching { api.journeys() }.onSuccess { journeyOptions.clear(); journeyOptions.addAll(it) }
+                        }
+                    }
                     pendingActivity = null
                     if (journey.activities.all { it.done || it.id == activity.id }) showOutcome = true
                 }) { Text("Not our thing", color = Pink) }
@@ -304,44 +600,88 @@ private fun StardustApp() {
         AlertDialog(
             onDismissRequest = { showOutcome = false },
             containerColor = Navy,
-            title = { Text(if (mode == "friend") "Did you find a friendship to keep?" else "What feels right for you two?", color = Paper) },
-            text = { Text(if (mode == "friend") "Good friends make room for more small adventures." else "A good match can take many shapes. Choose what you both want next.", color = Paper.copy(alpha = .8f)) },
+            title = { Text(if (journey.mode == "friend") "Did you find a friendship to keep?" else "What feels right for you two?", color = Paper) },
+            text = { Text(if (journey.mode == "friend") "Good friends make room for more small adventures." else "A good match can take many shapes. Choose what you both want next.", color = Paper.copy(alpha = .8f)) },
             confirmButton = {
                 TextButton(onClick = {
-                    if (mode == "friend") {
+                    if (journey.mode == "friend") {
                         journey = journey.copy(outcome = "friends")
-                        scope.launch { runCatching { api.submitOutcome("friends") } }
+                        scope.launch { runCatching { api.submitOutcome("friends", journey.partnerId) }.onSuccess { journey = it } }
                         infoMessage = "Here's to a friendship that feels like you."
                     } else {
                         journey = journey.copy(outcome = "marriage")
                         mode = "friend"
                         user = user.copy(relationshipLocked = true)
+                        onUserUpdated(user)
                         scope.launch {
-                            runCatching { api.submitOutcome("marriage") }.onSuccess { apiConnected = true }
+                            runCatching { api.submitOutcome("marriage", journey.partnerId) }.onSuccess { journey = it; apiConnected = true }
                             runCatching { api.profiles("friend") }.onSuccess { profiles.clear(); profiles.addAll(it); profileIndex = 0 }
                             runCatching { api.likes() }.onSuccess { likedProfiles.clear(); likedProfiles.addAll(it) }
+                            runCatching { api.journeys() }.onSuccess { journeyOptions.clear(); journeyOptions.addAll(it) }
                         }
                         tab = Tab.Swipe
                         infoMessage = "Your dating discovery is locked. You're now finding friends."
                     }
                     showOutcome = false
-                }) { Text(if (mode == "friend") "Keep this friendship" else "Build toward marriage", color = Gold) }
+                }) { Text(if (journey.mode == "friend") "Keep this friendship" else "Build toward marriage", color = Gold) }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    if (mode == "friend") {
+                Row {
+                    TextButton(onClick = {
+                        if (journey.mode == "friend") {
                         scope.launch {
-                            runCatching { api.generateJourney("friend") }.onSuccess { journey = it.copy(partnerName = journey.partnerName) }
+                                runCatching { api.generateJourney("friend", journey.partnerId) }.onSuccess { journey = it }
                         }
                         infoMessage = "A new friend adventure is on its way."
-                    } else {
-                        journey = journey.copy(outcome = "friends")
-                        scope.launch { runCatching { api.submitOutcome("friends") } }
-                        infoMessage = "Friendship can be its own kind of magic."
+                        } else {
+                            journey = journey.copy(outcome = "friends")
+                            scope.launch { runCatching { api.submitOutcome("friends", journey.partnerId) }.onSuccess { journey = it } }
+                            infoMessage = "Friendship can be its own kind of magic."
+                        }
+                        showOutcome = false
+                    }) { Text(if (journey.mode == "friend") "Another adventure" else "Just friends", color = Blue) }
+                    if (journey.mode == "dating") {
+                        TextButton(onClick = {
+                            scope.launch {
+                                runCatching { api.submitOutcome("still-thinking", journey.partnerId) }.onSuccess {
+                                    journey = it
+                                    apiConnected = true
+                                    infoMessage = "Here are fresh ideas for your dating journey."
+                                }.onFailure { infoMessage = it.message ?: "Could not refresh this journey." }
+                            }
+                            showOutcome = false
+                        }) { Text("Still thinking", color = Gold) }
                     }
-                    showOutcome = false
-                }) { Text(if (mode == "friend") "Another adventure" else "Just friends", color = Blue) }
+                }
             }
+        )
+    }
+
+    swipeNotification?.let { notification ->
+        AlertDialog(
+            onDismissRequest = { swipeNotification = null },
+            containerColor = Navy,
+            title = { Text("${notification.actorName} chose you!", color = Paper) },
+            text = { Text("They swiped right and would like to chat with you.", color = Paper.copy(alpha = .8f)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        runCatching { api.chats() }.onSuccess { refreshed ->
+                            chats.clear()
+                            chats.addAll(refreshed)
+                            val chat = refreshed.firstOrNull { it.id == notification.chatId }
+                            if (chat != null) {
+                                selectedChat = chat
+                                messages.clear()
+                                runCatching { api.messages(chat.id) }.onSuccess { messages.addAll(it) }
+                            }
+                            tab = Tab.Chat
+                        }
+                        swipeNotification = null
+                    }
+                }) { Text("Open chat", color = Gold) }
+            },
+            dismissButton = { TextButton(onClick = { swipeNotification = null }) { Text("Later", color = Paper) } }
         )
     }
 
@@ -399,32 +739,16 @@ private fun TopBrand(apiConnected: Boolean, mode: String, user: UserProfile) {
             Text("Stardust", color = Paper, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
             Text(if (mode == "friend") "YOUR PEOPLE, WRITTEN IN THE STARS" else "FIND YOUR DESTINED STAR", color = Pink, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
         }
-        Column(horizontalAlignment = Alignment.End) {
+        Column(Modifier.width(100.dp), horizontalAlignment = Alignment.End) {
             Text(if (apiConnected) "API LIVE" else "DEMO MODE", color = if (apiConnected) Blue else Gold, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-            Text(user.name.substringBefore(" "), color = Paper.copy(alpha = .75f), fontSize = 11.sp)
+            Text(user.name, color = Paper.copy(alpha = .75f), fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End)
         }
     }
 }
 
 @Composable
 private fun LogoMark(size: androidx.compose.ui.unit.Dp) {
-    Canvas(Modifier.size(size)) {
-        val center = Offset(this.size.width / 2, this.size.height / 2)
-        drawCircle(Brush.linearGradient(listOf(Navy, Ink)), radius = this.size.minDimension / 2, center = center)
-        drawCircle(Pink.copy(alpha = .8f), radius = this.size.minDimension / 2, center = center, style = Stroke(1.2.dp.toPx()))
-        val star = Path()
-        val radius = this.size.minDimension * .27f
-        repeat(10) { index ->
-            val angle = Math.toRadians((-90 + index * 36).toDouble())
-            val r = if (index % 2 == 0) radius else radius * .45f
-            val x = center.x + kotlin.math.cos(angle).toFloat() * r
-            val y = center.y + kotlin.math.sin(angle).toFloat() * r
-            if (index == 0) star.moveTo(x, y) else star.lineTo(x, y)
-        }
-        star.close()
-        drawPath(star, Gold, style = Stroke(width = 1.7.dp.toPx(), cap = StrokeCap.Round))
-        drawCircle(Paper, radius = 1.4.dp.toPx(), center = Offset(this.size.width * .75f, this.size.height * .27f))
-    }
+    Image(painterResource(R.drawable.stardust_mark), contentDescription = "Stardust logo", modifier = Modifier.size(size))
 }
 
 @Composable
@@ -561,12 +885,40 @@ private fun RoundAction(symbol: String, label: String, tint: Color, onClick: () 
 }
 
 @Composable
-private fun JourneyScreen(journey: Journey, hasConnection: Boolean, onFinishActivity: (JourneyActivity) -> Unit, onDecision: () -> Unit, onRegenerate: () -> Unit) {
+private fun JourneyScreen(
+    journey: Journey,
+    journeys: List<JourneySummary>,
+    onSelectJourney: (JourneySummary) -> Unit,
+    onFinishActivity: (JourneyActivity) -> Unit,
+    onSkipActivity: (JourneyActivity) -> Unit,
+    onDecision: () -> Unit,
+    onRegenerate: () -> Unit
+) {
     Column(Modifier.fillMaxSize()) {
         PageHeading("Your journey", "Little moments, made for ${journey.partnerName}", trailing = {
-            IconButton(onClick = onRegenerate) { Icon(Icons.Filled.Refresh, "New journey", tint = Paper) }
+            if (journeys.isNotEmpty()) IconButton(onClick = onRegenerate) { Icon(Icons.Filled.Refresh, "New journey", tint = Paper) }
         })
-        if (!hasConnection) {
+        if (journeys.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                journeys.forEach { option ->
+                    val selected = option.partnerId == journey.partnerId
+                    Surface(
+                        Modifier.clip(RoundedCornerShape(16.dp)).clickable { onSelectJourney(option) },
+                        color = if (selected) Color(0xDD526D9D) else Color(0xAA202A46),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(Modifier.padding(horizontal = 13.dp, vertical = 8.dp)) {
+                            Text(option.partnerName, color = Paper, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text("${option.mode} · ${option.completedActivities}/${option.totalActivities}", color = Paper.copy(alpha = .68f), fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+        }
+        if (journeys.isEmpty()) {
             Box(Modifier.weight(1f).padding(28.dp), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Filled.Explore, null, tint = Gold, modifier = Modifier.size(42.dp))
@@ -601,13 +953,22 @@ private fun JourneyScreen(journey: Journey, hasConnection: Boolean, onFinishActi
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(activity.title, color = Paper, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                             Text(activity.detail, color = Paper.copy(alpha = .72f), fontSize = 12.sp, lineHeight = 17.sp)
-                            if (!activity.done) TextButton(onClick = { onFinishActivity(activity) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) { Text("Mark complete  →", color = Gold, fontSize = 12.sp) }
+                            if (!activity.done) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    TextButton(onClick = { onFinishActivity(activity) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) { Text("Mark complete  →", color = Gold, fontSize = 12.sp) }
+                                    TextButton(onClick = { onSkipActivity(activity) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) { Text("Skip idea", color = Blue, fontSize = 12.sp) }
+                                }
+                            }
                             else Text("CHECKED IN", color = Blue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
-            if (journey.activities.isNotEmpty() && journey.activities.all { it.done }) {
+            if (journey.outcome != null) {
+                OutlinedButton(onClick = onRegenerate, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Text("Generate another set of ideas", color = Paper)
+                }
+            } else if (journey.activities.isNotEmpty() && journey.activities.all { it.done }) {
                 Button(onClick = onDecision, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Pink), shape = RoundedCornerShape(16.dp)) {
                     Text("Choose what comes next", color = Ink, fontWeight = FontWeight.Bold)
                 }
@@ -741,7 +1102,7 @@ private fun StreakBadge(streak: Int) {
 }
 
 @Composable
-private fun ProfileScreen(user: UserProfile, committed: Boolean, onEdit: () -> Unit) {
+private fun ProfileScreen(user: UserProfile, committed: Boolean, onEdit: () -> Unit, onSignOut: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PageHeading("Your profile", "A little of the person behind the stars")
         Card(colors = CardDefaults.cardColors(containerColor = Glass), shape = RoundedCornerShape(24.dp)) {
@@ -764,6 +1125,7 @@ private fun ProfileScreen(user: UserProfile, committed: Boolean, onEdit: () -> U
         Button(onClick = onEdit, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xDD34436B)), shape = RoundedCornerShape(15.dp)) {
             Text("Edit my details", color = Paper, fontWeight = FontWeight.SemiBold)
         }
+        TextButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out", color = Pink) }
         Spacer(Modifier.height(10.dp))
     }
 }

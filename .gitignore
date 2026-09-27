@@ -2,6 +2,7 @@
 .kotlin/
 **/build/
 local.properties
+data/
 *.iml
 .idea/
 captures/
