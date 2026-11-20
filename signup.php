@@ -14,7 +14,7 @@ $old = [
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_valid()) {
-        $errors['form'] = 'Sesi tidak valid. Silakan muat ulang halaman.';
+        $errors['form'] = 'Invalid session. Please reload.';
     } else {
         foreach ($old as $k => $_) {
             $old[$k] = trim($_POST[$k] ?? '');
@@ -23,30 +23,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $phone    = normalize_phone($old['phone']);
 
         if (mb_strlen($old['full_name']) < 2 || mb_strlen($old['full_name']) > 100) {
-            $errors['full_name'] = 'Nama lengkap 2-100 karakter.';
+            $errors['full_name'] = 'Your name must have 2-100 character.';
         }
         if (!in_array($old['gender'], ['Male', 'Female', 'Others'], true)) {
-            $errors['gender'] = 'Pilih gender.';
+            $errors['gender'] = 'Choose gender.';
         }
 
         $dt = DateTime::createFromFormat('Y-m-d', $old['birth_date']);
         if (!$dt || $dt->format('Y-m-d') !== $old['birth_date']) {
-            $errors['birth_date'] = 'Tanggal lahir tidak valid.';
+            $errors['birth_date'] = 'Invalid birthdate.';
         } elseif ($dt->diff(new DateTime('today'))->y < 18 || $dt > new DateTime('today')) {
-            $errors['birth_date'] = 'Usia minimal 18 tahun.';
+            $errors['birth_date'] = 'You must be at least 18 years old.';
         }
 
         if ($old['location'] === '' || mb_strlen($old['location']) > 150) {
-            $errors['location'] = 'Lokasi wajib diisi.';
+            $errors['location'] = 'You must input location.';
         }
         if (!preg_match('/^\+?[0-9]{8,15}$/', $phone)) {
-            $errors['phone'] = 'Nomor telepon tidak valid.';
+            $errors['phone'] = 'Invalid phone number.';
         }
         if (!filter_var($old['email'], FILTER_VALIDATE_EMAIL)) {
-            $errors['email'] = 'Format email tidak valid.';
+            $errors['email'] = 'Invalid email format.';
         }
         if (strlen($password) < 8) {
-            $errors['password'] = 'Password minimal 8 karakter.';
+            $errors['password'] = 'Password must contain at least 8 character.';
         }
 
         if (!$errors) {
@@ -54,8 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = db()->prepare('SELECT email, phone FROM users WHERE email = ? OR phone = ?');
                 $stmt->execute([strtolower($old['email']), $phone]);
                 foreach ($stmt->fetchAll() as $row) {
-                    if ($row['email'] === strtolower($old['email'])) $errors['email'] = 'Email sudah terdaftar.';
-                    if ($row['phone'] === $phone) $errors['phone'] = 'Nomor telepon sudah terdaftar.';
+                    if ($row['email'] === strtolower($old['email'])) $errors['email'] = 'Email already registered.';
+                    if ($row['phone'] === $phone) $errors['phone'] = 'Phone number already registered.';
                 }
 
                 if (!$errors) {
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     redirect('home.php');
                 }
             } catch (PDOException $ex) {
-                $errors['form'] = 'Terjadi kesalahan pada server. Coba lagi nanti.';
+                $errors['form'] = 'There's been an error on the server. Try again later.';
             }
         }
     }
