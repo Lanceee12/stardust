@@ -1,0 +1,289 @@
+/* ==========================================
+   Stardust - style.css
+   Fonts: Poppins (heading/button), DM Sans (body/form)
+   ========================================== */
+:root {
+  --bg-top: #0a0614;
+  --bg-mid: #150d2e;
+  --bg-bottom: #1d4ed8;
+  --pink: #f9b8d3;
+  --gold: #f4d089;
+  --text: #ffffff;
+  --muted: #b9b3cc;
+  --field-bg: rgba(255, 255, 255, 0.08);
+  --field-border: rgba(255, 255, 255, 0.14);
+  --error: #ff8a9b;
+  --grad-text: linear-gradient(90deg, var(--pink), var(--gold));
+  --grad-btn: linear-gradient(90deg, #f9b8d3 0%, #f4d089 100%);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { min-height: 100%; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: #05030c;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--gold); text-decoration: none; font-weight: 600; }
+a:hover { text-decoration: underline; }
+
+/* ---------- Frame ponsel ---------- */
+.phone {
+  position: relative;
+  width: 100%;
+  max-width: 430px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 56px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    radial-gradient(1.2px 1.2px at 12% 18%, rgba(255,255,255,.7), transparent 60%),
+    radial-gradient(1px 1px at 78% 12%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(1.4px 1.4px at 40% 34%, rgba(255,255,255,.5), transparent 60%),
+    radial-gradient(1px 1px at 88% 46%, rgba(255,255,255,.55), transparent 60%),
+    radial-gradient(1.2px 1.2px at 20% 62%, rgba(255,255,255,.5), transparent 60%),
+    radial-gradient(1px 1px at 64% 72%, rgba(255,255,255,.45), transparent 60%),
+    radial-gradient(1.2px 1.2px at 30% 88%, rgba(255,255,255,.5), transparent 60%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 55%, var(--bg-bottom) 130%);
+}
+
+@media (min-width: 431px) {
+  body { padding: 24px 0; }
+  .phone {
+    min-height: 860px;
+    border-radius: 36px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
+  }
+}
+
+/* ---------- Teks ---------- */
+.grad-text {
+  background: var(--grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.page-title {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.25;
+  text-align: center;
+  margin-bottom: 28px;
+}
+.page-title small {
+  display: block;
+  font-size: 22px;
+}
+
+.muted { color: var(--muted); }
+.center { text-align: center; }
+
+/* ---------- Form ---------- */
+.form { display: flex; flex-direction: column; }
+
+.form-group { margin-bottom: 16px; }
+
+.form-group > label,
+.form-group > .label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #fff;
+}
+
+.input-wrap { position: relative; }
+
+.field {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: #fff;
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color .2s, background .2s;
+}
+.field::placeholder { color: rgba(255,255,255,.35); }
+.field:focus {
+  border-color: var(--gold);
+  background: rgba(255,255,255,.12);
+}
+input[type="date"].field { color-scheme: dark; }
+
+.field-action {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+.error-text { display: block; font-size: 11.5px; color: var(--error); margin-top: 5px; }
+
+.alert {
+  font-size: 12.5px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  line-height: 1.45;
+}
+.alert-error   { background: rgba(255,138,155,.12); border: 1px solid rgba(255,138,155,.4); color: #ffc4cc; }
+.alert-success { background: rgba(120,230,170,.12); border: 1px solid rgba(120,230,170,.4); color: #b8f2d2; }
+.alert-info    { background: rgba(244,208,137,.12); border: 1px solid rgba(244,208,137,.4); color: var(--gold); }
+
+/* Radio gender */
+.radio-row { display: flex; gap: 18px; }
+.radio-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: #fff;
+}
+.radio-row input { position: absolute; opacity: 0; pointer-events: none; }
+.radio-row .dot {
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  display: inline-block;
+  position: relative;
+}
+.radio-row input:checked + .dot { border-color: var(--gold); }
+.radio-row input:checked + .dot::after {
+  content: '';
+  position: absolute; inset: 2px;
+  background: var(--gold);
+  border-radius: 50%;
+}
+
+/* ---------- Tombol ---------- */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2a1740;
+  background: var(--grad-btn);
+  box-shadow: 0 6px 18px rgba(244, 208, 137, .25);
+  transition: transform .15s, box-shadow .15s;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(244,208,137,.35); text-decoration: none; }
+.btn:active { transform: translateY(0); }
+
+.link-small { font-size: 12.5px; }
+.link-row { text-align: center; font-size: 12px; color: var(--muted); margin-top: 16px; }
+.link-row a { margin-left: 4px; }
+.forgot-link { text-align: right; margin: -4px 0 22px; font-size: 11.5px; }
+
+/* ---------- Placeholder gambar ---------- */
+.img-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,.45);
+  font-size: 12px;
+  text-align: center;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.04) 0 10px, transparent 10px 20px);
+  border: 1.5px dashed rgba(255,255,255,.25);
+}
+
+/* ---------- Splash ---------- */
+.splash {
+  display: flex; flex-direction: column;
+  flex: 1; width: 100%;
+  justify-content: center; align-items: center;
+  text-align: center; cursor: pointer;
+}
+.logo-circle {
+  width: 112px; height: 112px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(244, 208, 137, .6);
+  background: radial-gradient(circle at 50% 40%, rgba(120,90,200,.35), rgba(15,10,40,.9));
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  margin-bottom: 22px;
+  box-shadow: 0 0 40px rgba(167, 139, 250, .25);
+}
+.logo-circle .star-top { position: absolute; top: 18px; }
+.brand {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+}
+.tagline {
+  font-family: 'Poppins', sans-serif;
+  font-size: 10px;
+  letter-spacing: 2.2px;
+  color: var(--pink);
+  margin-top: 4px;
+}
+
+/* ---------- Welcome ---------- */
+.welcome { align-items: center; text-align: center; padding-top: 40px; }
+.hero-img {
+  width: 230px; height: 230px;
+  border-radius: 50%;
+  margin: 8px 0 20px;
+  flex-shrink: 0;
+}
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 1px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.16);
+  margin: 10px 0 18px;
+}
+.welcome h1 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 26px;
+  margin-bottom: 10px;
+}
+.welcome p { font-size: 13px; line-height: 1.6; color: var(--muted); max-width: 320px; }
+.welcome .actions { width: 100%; margin-top: auto; padding-top: 28px; }
+.welcome .actions .btn { margin-bottom: 14px; }
+
+/* ---------- Home (placeholder) ---------- */
+.home-card {
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.8;
+}
