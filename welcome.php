@@ -1,5 +1,4 @@
 <?php
-// Halaman 2: Login / Welcome
 require_once __DIR__ . '/config.php';
 
 if (is_logged_in()) {
@@ -11,8 +10,7 @@ $bodyClass = 'welcome-page';
 ?>
 <?php require __DIR__ . '/header.php'; ?>
 <section class="welcome" style="display:flex;flex-direction:column;align-items:center;flex:1;">
-  <!-- Ganti dengan ilustrasi asli: <img class="hero-img" src="assets/hero.png" alt=""> -->
-  <div class="hero-img img-placeholder">Image placeholder</div>
+  <img class="logo-img" src="logo2.png" alt="Stardust">
 
   <h2 class="brand grad-text" style="font-family:'Poppins',sans-serif;font-size:22px;">Stardust</h2>
   <span class="badge">&#10022; COSMIC MATCHMAKING</span>
